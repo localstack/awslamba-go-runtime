@@ -1,3 +1,4 @@
 example/handler
 runtime/aws-lambda-mock
 go.sum
+runtime.zip
