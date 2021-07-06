@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -93,12 +94,13 @@ func main() {
 	var err error
 	var errored bool
 
-	path, err := os.Getwd()
+	path, err := os.Executable()
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println(path)
-	var mockServerCmd = exec.Command(path + "/mockserver")
+
+	mockServerPath := filepath.Dir(path) + "/mockserver"
+	var mockServerCmd = exec.Command(mockServerPath)
 	mockServerCmd.Env = append(os.Environ(),
 		"DOCKER_LAMBDA_NO_BOOTSTRAP=1",
 		"DOCKER_LAMBDA_USE_STDIN=1",
@@ -134,8 +136,6 @@ func main() {
 		resp.Body.Close()
 		break
 	}
-
-	fmt.Printf(handler)
 
 	var cmd *exec.Cmd
 	if *debugMode == true {
