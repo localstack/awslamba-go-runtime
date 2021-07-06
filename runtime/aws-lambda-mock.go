@@ -93,7 +93,12 @@ func main() {
 	var err error
 	var errored bool
 
-	var mockServerCmd = exec.Command("./mockserver")
+	path, err := os.Getwd()
+	if err != nil {
+		log.Println(err)
+	}
+	fmt.Println(path)
+	var mockServerCmd = exec.Command(path + "/mockserver")
 	mockServerCmd.Env = append(os.Environ(),
 		"DOCKER_LAMBDA_NO_BOOTSTRAP=1",
 		"DOCKER_LAMBDA_USE_STDIN=1",
