@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,32 +32,14 @@ var apiBase = "http://127.0.0.1:9001/2018-06-01"
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	debugMode := flag.Bool("debug", false, "enables delve debugging")
-	delvePath := flag.String("delvePath", "/tmp/lambci_debug_files/dlv", "path to delve")
-	delvePort := flag.String("delvePort", "5985", "port to start delve server on")
-	delveAPI := flag.String("delveAPI", "1", "delve api version")
-	flag.Parse()
-	positionalArgs := flag.Args()
-
-	var handler string
-	if len(positionalArgs) > 0 {
-		handler = positionalArgs[0]
-	} else {
-		handler = getEnv("AWS_LAMBDA_FUNCTION_HANDLER", getEnv("_HANDLER", "handler"))
-	}
-
-	var eventBody string
-	if len(positionalArgs) > 1 {
-		eventBody = positionalArgs[1]
-	} else {
-		eventBody = os.Getenv("AWS_LAMBDA_EVENT_BODY")
-		if eventBody == "" {
-			if os.Getenv("DOCKER_LAMBDA_USE_STDIN") != "" {
-				stdin, _ := ioutil.ReadAll(os.Stdin)
-				eventBody = string(stdin)
-			} else {
-				eventBody = "{}"
-			}
+	handler := getEnv("AWS_LAMBDA_FUNCTION_HANDLER", getEnv("_HANDLER", "handler"))
+	eventBody := os.Getenv("AWS_LAMBDA_EVENT_BODY")
+	if eventBody == "" {
+		if os.Getenv("DOCKER_LAMBDA_USE_STDIN") != "" {
+			stdin, _ := ioutil.ReadAll(os.Stdin)
+			eventBody = string(stdin)
+		} else {
+			eventBody = "{}"
 		}
 	}
 
@@ -100,7 +81,7 @@ func main() {
 	}
 
 	mockServerPath := filepath.Dir(path) + "/mockserver"
-	var mockServerCmd = exec.Command(mockServerPath)
+	mockServerCmd := exec.Command(mockServerPath)
 	mockServerCmd.Env = append(os.Environ(),
 		"DOCKER_LAMBDA_NO_BOOTSTRAP=1",
 		"DOCKER_LAMBDA_USE_STDIN=1",
@@ -137,20 +118,7 @@ func main() {
 		break
 	}
 
-	var cmd *exec.Cmd
-	if *debugMode == true {
-		delveArgs := []string{
-			"--listen=:" + *delvePort,
-			"--headless=true",
-			"--api-version=" + *delveAPI,
-			"--log",
-			"exec",
-			handler,
-		}
-		cmd = exec.Command(*delvePath, delveArgs...)
-	} else {
-		cmd = exec.Command(handler)
-	}
+	var cmd *exec.Cmd = exec.Command(handler)
 
 	cmd.Env = append(os.Environ(),
 		"_LAMBDA_SERVER_PORT="+port,
@@ -183,7 +151,7 @@ func main() {
 		return
 	}
 
-	defer syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	defer syscall.Kill(cmd.Process.Pid, syscall.SIGKILL)
 
 	var conn net.Conn
 	for {
@@ -242,6 +210,7 @@ func main() {
 
 		resp, err := http.Get(apiBase + "/runtime/invocation/next")
 		if err != nil {
+			syscall.Kill(cmd.Process.Pid, syscall.SIGKILL)
 			if uerr, ok := err.(*url.Error); ok {
 				if uerr.Unwrap().Error() == "EOF" {
 					if stayOpen {
@@ -364,6 +333,7 @@ func main() {
 		}
 		resp.Body.Close()
 	}
+
 }
 
 func abortInit(mockContext *mockLambdaContext, err error) {
