@@ -1,14 +1,20 @@
 package main
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func hello() (string, error) {
-	return "Hello ƛ!", nil
+type MyEvent struct {
+	Name string `json:"name"`
+}
+
+func HandleRequest(ctx context.Context, name MyEvent) (string, error) {
+	return fmt.Sprintf("Hello %s!", name.Name), nil
 }
 
 func main() {
-	// Make the handler available for Remote Procedure Call by AWS Lambda
-	lambda.Start(hello)
+	lambda.Start(HandleRequest)
 }
