@@ -15,3 +15,6 @@ test:
 
 zip:
 	make build && zip runtime.zip runtime/aws-lambda-mock runtime/mockserver
+
+zip-example:
+	make build-test && cd example && zip example.zip handler
