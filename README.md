@@ -54,3 +54,8 @@ dist
 ```
 
 The .tar.gz files can then be used for a release.
+
+
+## Legal
+
+* `cmd/mockserver/main.go`: Copyright 2016 Michael Hart and LambCI contributors
