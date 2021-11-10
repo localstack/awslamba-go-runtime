@@ -1,5 +1,8 @@
 example/handler
 example/example.zip
-runtime/aws-lambda-mock
+
 go.sum
 runtime.zip
+
+bin/
+dist/

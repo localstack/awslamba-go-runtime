@@ -1,20 +1,53 @@
+# distribution
+DIST_NAME=awslamba-go-runtime
+DIST_VERSION ?= 
+
+# Go parameters
+GOCMD=go
+GOINSTALL=$(GOCMD) install
+GOBUILD=$(GOCMD) build
+GOCLEAN=$(GOCMD) clean
+GOTEST=$(GOCMD) test
+GOGET=$(GOCMD) get
+
+CURDIR=$(shell pwd)
+export GOBIN := $(CURDIR)/bin
+
+all: test build-all
+
 build:
-	cd runtime && \
-	go mod download && \
-	GOOS=linux go build aws-lambda-mock.go;
+	$(GOINSTALL) ./...
 
-build-test:
-	cd example && \
-	go mod download && \
-	GOOS=linux go build handler.go;
+build-example:
+	go build -o $(GOBIN)/handler examples/handler/handler.go
 
-test:
-	make build && make build-test &&\
-	_HANDLER=${PWD}/example/handler ./runtime/aws-lambda-mock
+test: build build-example
+	AWS_LAMBDA_EVENT_BODY='{"name": "localstack"}' \
+	_HANDLER=$(GOBIN)/handler \
+	$(GOBIN)/aws-lambda-mock
 
+clean:
+	$(GOCLEAN)
+	rm -rf bin/
+	rm -rf dist/
 
-zip:
-	make build && zip runtime.zip runtime/aws-lambda-mock runtime/mockserver
+# cross-platform build
 
-zip-example:
-	make build-test && cd example && zip example.zip handler
+DIST_FILE_PREFIX=
+ifeq (, $(DIST_VERSION))
+	DIST_FILE_PREFIX=$(DIST_NAME)
+else
+	DIST_FILE_PREFIX=$(DIST_NAME)-$(DIST_VERSION)
+endif
+
+PLATFORMS := linux/amd64 linux/arm64
+
+temp = $(subst /, ,$@)
+os = $(word 1, $(temp))
+arch = $(word 2, $(temp))
+
+dist: $(PLATFORMS)
+	for d in dist/*; do tar -czf $${d}.tar.gz $${d} ; done
+
+$(PLATFORMS):
+	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/$(DIST_FILE_PREFIX)-$(os)-$(arch)/' ./...
