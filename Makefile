@@ -47,7 +47,7 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 
 dist: $(PLATFORMS)
-	for d in dist/*; do tar -czf $${d}.tar.gz $${d} ; done
+	for d in dist/*; do tar -czf $${d}.tar.gz -C $${d} mockserver aws-lambda-mock; done
 
 $(PLATFORMS):
 	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/$(DIST_FILE_PREFIX)-$(os)-$(arch)/' ./...
