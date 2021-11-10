@@ -55,6 +55,12 @@ dist
 
 The .tar.gz files can then be used for a release.
 
+### Build for debian buster (GLIBC==2.28)
+
+The following make target will run `make dist` the build in a `golang:1.16-buster` docker image.
+
+    DIST_VERSION=0.3.0 make build-buster
+
 
 ## Legal
 

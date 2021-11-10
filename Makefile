@@ -51,3 +51,16 @@ dist: $(PLATFORMS)
 
 $(PLATFORMS):
 	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/$(DIST_FILE_PREFIX)-$(os)-$(arch)/' ./...
+
+
+UID := $(shell id -u)
+GID := $(shell id -g)
+
+dist-buster:
+	docker run -it --rm --workdir /go/code \
+		-v $$(pwd):/go/code \
+		-e DIST_VERSION=$(DIST_VERSION) \
+		golang:1.16-buster \
+		bash -c "make clean dist; chown -R ${UID}:${GID} dist"
+
+.PHONY: dist-buster dist build build-example test clean
