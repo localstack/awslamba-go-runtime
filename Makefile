@@ -47,10 +47,22 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 
 dist: $(PLATFORMS)
-	for d in dist/*; do tar -czf $${d}.tar.gz -C $${d} mockserver aws-lambda-mock; done
+	for d in dist/*; do \
+		if test -d $${d}; then \
+			tar -czf $${d}.tar.gz -C $${d} mockserver aws-lambda-mock; \
+		fi \
+	done; \
+	cd dist; \
+	for f in handler-*; do \
+		cp $${f} handler; \
+		tar -czf "example-`basename $${f}`.tar.gz" handler; \
+		rm handler; \
+	done;
+
 
 $(PLATFORMS):
-	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/$(DIST_FILE_PREFIX)-$(os)-$(arch)/' ./...
+	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/$(DIST_FILE_PREFIX)-$(os)-$(arch)/' ./...;
+	GOOS=$(os) GOARCH=$(arch) go build -v -o 'dist/handler-$(os)-$(arch)' ./examples/handler/handler.go
 
 
 UID := $(shell id -u)
