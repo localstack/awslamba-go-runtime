@@ -176,6 +176,8 @@ func main() {
 		log.Fatal(err)
 		return
 	}
+	
+	runtimeAddress = runtimeListener.Addr().(*net.TCPAddr).String()
 
 	var runtimeServer *http.Server
 
@@ -197,7 +199,7 @@ func main() {
 		<-interrupt
 	} else {
 		res, err := http.Post(
-			"http://127.0.0.1:"+runtimePort+"/2015-03-31/functions/"+curContext.FnName+"/invocations",
+			"http://"+runtimeAddress+"/2015-03-31/functions/"+curContext.FnName+"/invocations",
 			"application/json",
 			bytes.NewBuffer(eventBody),
 		)
