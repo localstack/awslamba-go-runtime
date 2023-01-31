@@ -27,7 +27,16 @@ import (
 	"github.com/aws/aws-lambda-go/lambda/messages"
 )
 
-var apiBase = "http://127.0.0.1:9001/2018-06-01"
+var apiBaseFmt = "http://127.0.0.1:%d/2018-06-01"
+
+func getFreePort(inputPort string) (port int, err error) {
+	var l net.Listener
+	if l, err = net.Listen("tcp", "127.0.0.1:" + inputPort); err == nil {
+		defer l.Close()
+		port = l.Addr().(*net.TCPAddr).Port
+	}
+	return
+}
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -61,7 +70,6 @@ func main() {
 	awsAccessKey := getEnv("AWS_ACCESS_KEY", os.Getenv("AWS_ACCESS_KEY_ID"))
 	awsSecretKey := getEnv("AWS_SECRET_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY"))
 	awsSessionToken := getEnv("AWS_SESSION_TOKEN", os.Getenv("AWS_SECURITY_TOKEN"))
-	port := getEnv("_LAMBDA_SERVER_PORT", "54321")
 
 	os.Setenv("AWS_LAMBDA_FUNCTION_NAME", mockContext.FnName)
 	os.Setenv("AWS_LAMBDA_FUNCTION_VERSION", mockContext.Version)
@@ -82,9 +90,16 @@ func main() {
 
 	mockServerPath := filepath.Dir(path) + "/mockserver"
 	mockServerCmd := exec.Command(mockServerPath)
+	runtimePort, err := getFreePort(getEnv("DOCKER_LAMBDA_RUNTIME_PORT", "9001"))
+	if err != nil {
+		log.Fatalf("Error reserving mock server port: %s", err.Error())
+		return
+	}
+	os.Unsetenv("DOCKER_LAMBDA_RUNTIME_PORT")
 	mockServerCmd.Env = append(os.Environ(),
 		"DOCKER_LAMBDA_NO_BOOTSTRAP=1",
 		"DOCKER_LAMBDA_USE_STDIN=1",
+		fmt.Sprintf("DOCKER_LAMBDA_RUNTIME_PORT=%d", runtimePort),
 	)
 	mockServerCmd.Stdout = os.Stdout
 	mockServerCmd.Stderr = os.Stderr
@@ -97,6 +112,8 @@ func main() {
 	stdin.Close()
 
 	defer mockServerCmd.Wait()
+
+	apiBase := fmt.Sprintf(apiBaseFmt, runtimePort)
 
 	pingTimeout := time.Now().Add(1 * time.Second)
 
@@ -120,8 +137,13 @@ func main() {
 
 	var cmd *exec.Cmd = exec.Command(handler)
 
+	port, err := getFreePort(getEnv("_LAMBDA_SERVER_PORT", "54321"))
+	if err != nil {
+		log.Fatalf("Lambda port is busy: %s", err.Error())
+	}
+	os.Unsetenv("_LAMBDA_SERVER_PORT")
 	cmd.Env = append(os.Environ(),
-		"_LAMBDA_SERVER_PORT="+port,
+		fmt.Sprintf("_LAMBDA_SERVER_PORT=%d", port),
 		"AWS_ACCESS_KEY="+awsAccessKey,
 		"AWS_ACCESS_KEY_ID="+awsAccessKey,
 		"AWS_SECRET_KEY="+awsSecretKey,
@@ -147,7 +169,7 @@ func main() {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	if err = cmd.Start(); err != nil {
-		defer abortInit(mockContext, err)
+		defer abortInit(apiBase, mockContext, err)
 		return
 	}
 
@@ -155,9 +177,9 @@ func main() {
 
 	var conn net.Conn
 	for {
-		conn, err = net.Dial("tcp", ":"+port)
+		conn, err = net.Dial("tcp", fmt.Sprintf(":%d", port))
 		if mockContext.HasExpired() {
-			defer abortInit(mockContext, mockContext.TimeoutErr())
+			defer abortInit(apiBase, mockContext, mockContext.TimeoutErr())
 			return
 		}
 		if err == nil {
@@ -170,7 +192,7 @@ func main() {
 				continue
 			}
 		}
-		defer abortInit(mockContext, err)
+		defer abortInit(apiBase, mockContext, err)
 		return
 	}
 
@@ -179,7 +201,7 @@ func main() {
 	for {
 		err = client.Call("Function.Ping", messages.PingRequest{}, &messages.PingResponse{})
 		if mockContext.HasExpired() {
-			defer abortInit(mockContext, mockContext.TimeoutErr())
+			defer abortInit(apiBase, mockContext, mockContext.TimeoutErr())
 			return
 		}
 		if err == nil {
@@ -336,7 +358,7 @@ func main() {
 
 }
 
-func abortInit(mockContext *mockLambdaContext, err error) {
+func abortInit(apiBase string, mockContext *mockLambdaContext, err error) {
 	lambdaErr := toLambdaError(mockContext, err)
 	jsonBytes, _ := json.Marshal(lambdaErr)
 	resp, err := http.Post(apiBase+"/runtime/init/error", "application/json", bytes.NewBuffer(jsonBytes))

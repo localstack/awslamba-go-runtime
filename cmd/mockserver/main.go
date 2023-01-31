@@ -47,7 +47,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/rjeczalik/notify"
 )
@@ -176,8 +176,6 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	
-	runtimeAddress = runtimeListener.Addr().(*net.TCPAddr).String()
 
 	var runtimeServer *http.Server
 
@@ -199,7 +197,7 @@ func main() {
 		<-interrupt
 	} else {
 		res, err := http.Post(
-			"http://"+runtimeAddress+"/2015-03-31/functions/"+curContext.FnName+"/invocations",
+			"http://127.0.0.1:"+runtimePort+"/2015-03-31/functions/"+curContext.FnName+"/invocations",
 			"application/json",
 			bytes.NewBuffer(eventBody),
 		)
